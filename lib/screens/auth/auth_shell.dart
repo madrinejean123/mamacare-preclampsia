@@ -85,6 +85,7 @@ class AuthField extends StatelessWidget {
   final String? hint;
   final bool obscure;
   final TextInputType? keyboardType;
+  final TextEditingController? controller;
 
   const AuthField({
     super.key,
@@ -92,6 +93,7 @@ class AuthField extends StatelessWidget {
     this.hint,
     this.obscure = false,
     this.keyboardType,
+    this.controller,
   });
 
   @override
@@ -102,6 +104,7 @@ class AuthField extends StatelessWidget {
         Text(label, style: AppTextStyles.label(context)),
         const SizedBox(height: 6),
         TextField(
+          controller: controller,
           obscureText: obscure,
           keyboardType: keyboardType,
           style: AppTextStyles.body(context),

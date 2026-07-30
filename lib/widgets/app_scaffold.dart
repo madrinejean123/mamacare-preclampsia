@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../theme/breakpoints.dart';
 import 'theme_toggle_button.dart';
+
+Future<void> _logout(BuildContext context) async {
+  await AuthService.instance.logout();
+  if (context.mounted) context.go('/');
+}
 
 class NavDestinationSpec {
   final String label;
@@ -116,7 +122,7 @@ class AppScaffold extends StatelessWidget {
                         ThemeToggleButton(color: Colors.white.withValues(alpha: 0.75)),
                         IconButton(
                           tooltip: 'Log out',
-                          onPressed: () => context.go('/'),
+                          onPressed: () => _logout(context),
                           icon: Icon(Icons.logout_rounded, color: Colors.white.withValues(alpha: 0.75), size: 20),
                         ),
                       ],
@@ -171,7 +177,7 @@ class AppScaffold extends StatelessWidget {
           ThemeToggleButton(color: Colors.white.withValues(alpha: 0.85)),
           IconButton(
             tooltip: 'Log out',
-            onPressed: () => context.go('/'),
+            onPressed: () => _logout(context),
             icon: Icon(Icons.logout_rounded, color: Colors.white.withValues(alpha: 0.85), size: 20),
           ),
           const SizedBox(width: 4),
@@ -256,7 +262,7 @@ class _Sidebar extends StatelessWidget {
           ..._manageSection.map((d) => _SidebarItem(spec: d, selected: d.route == currentRoute)),
           const Spacer(),
           InkWell(
-            onTap: () => context.go('/'),
+            onTap: () => _logout(context),
             borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/mock_data.dart';
 import '../../models/patient.dart';
 import '../../models/risk_level.dart';
+import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/breakpoints.dart';
+import '../../widgets/add_patient_dialog.dart';
+import '../../widgets/alert_strip.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/patient_tile.dart';
 
@@ -21,9 +23,16 @@ class PatientsListScreen extends StatefulWidget {
 class _PatientsListScreenState extends State<PatientsListScreen> {
   String _query = '';
   RiskLevel? _filter;
+  late Future<List<Patient>> _future;
 
-  List<Patient> get _filtered {
-    var list = MockData.patients;
+  @override
+  void initState() {
+    super.initState();
+    _future = PatientService().fetchPatients();
+  }
+
+  List<Patient> _filteredFrom(List<Patient> patients) {
+    var list = patients;
     if (_filter != null) {
       list = list.where((p) => p.riskLevel == _filter).toList();
     }
@@ -34,9 +43,9 @@ class _PatientsListScreenState extends State<PatientsListScreen> {
     return list;
   }
 
-  int _countFor(RiskLevel? level) {
-    if (level == null) return MockData.patients.length;
-    return MockData.patients.where((p) => p.riskLevel == level).length;
+  int _countFor(List<Patient> patients, RiskLevel? level) {
+    if (level == null) return patients.length;
+    return patients.where((p) => p.riskLevel == level).length;
   }
 
   @override
@@ -48,15 +57,44 @@ class _PatientsListScreenState extends State<PatientsListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Header(phone: phone, onQueryChanged: (v) => setState(() => _query = v)),
-          const SizedBox(height: AppSpacing.md),
-          _FilterChips(
-            selected: _filter,
-            countFor: _countFor,
-            onSelected: (level) => setState(() => _filter = level),
+          _Header(
+            phone: phone,
+            onQueryChanged: (v) => setState(() => _query = v),
+            onPatientAdded: () => setState(() => _future = PatientService().fetchPatients()),
           ),
-          const SizedBox(height: AppSpacing.cardGap),
-          phone ? _PatientCardsList(patients: _filtered) : _PatientsTable(patients: _filtered),
+          const SizedBox(height: AppSpacing.md),
+          FutureBuilder<List<Patient>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return AlertStrip(
+                  icon: Icons.error_outline_rounded,
+                  tone: AlertTone.danger,
+                  text: 'Could not load patients: ${snapshot.error}',
+                );
+              }
+              final patients = snapshot.data!;
+              final filtered = _filteredFrom(patients);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _FilterChips(
+                    selected: _filter,
+                    countFor: (level) => _countFor(patients, level),
+                    onSelected: (level) => setState(() => _filter = level),
+                  ),
+                  const SizedBox(height: AppSpacing.cardGap),
+                  phone ? _PatientCardsList(patients: filtered) : _PatientsTable(patients: filtered),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -66,8 +104,9 @@ class _PatientsListScreenState extends State<PatientsListScreen> {
 class _Header extends StatelessWidget {
   final bool phone;
   final ValueChanged<String> onQueryChanged;
+  final VoidCallback onPatientAdded;
 
-  const _Header({required this.phone, required this.onQueryChanged});
+  const _Header({required this.phone, required this.onQueryChanged, required this.onPatientAdded});
 
   Widget _search(BuildContext context) {
     return SizedBox(
@@ -85,7 +124,12 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = ElevatedButton.icon(
+    final addButton = OutlinedButton.icon(
+      onPressed: () => showDialog(context: context, builder: (_) => AddPatientDialog(onAdded: (_) => onPatientAdded())),
+      icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+      label: const Text('Add patient'),
+    );
+    final assessButton = ElevatedButton.icon(
       onPressed: () => context.go('/assess'),
       icon: const Icon(Icons.add, size: 18),
       label: const Text('New assessment'),
@@ -98,11 +142,18 @@ class _Header extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text('Patients', style: AppTextStyles.screenTitle(context))),
-              button,
             ],
           ),
           const SizedBox(height: 14),
           SizedBox(width: double.infinity, child: _SearchFull(onQueryChanged: onQueryChanged)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: addButton),
+              const SizedBox(width: 10),
+              Expanded(child: assessButton),
+            ],
+          ),
         ],
       );
     }
@@ -112,7 +163,9 @@ class _Header extends StatelessWidget {
         Expanded(child: Text('Patients', style: AppTextStyles.screenTitle(context))),
         _search(context),
         const SizedBox(width: 12),
-        button,
+        addButton,
+        const SizedBox(width: 12),
+        assessButton,
       ],
     );
   }

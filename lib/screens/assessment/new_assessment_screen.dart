@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/mock_data.dart';
+import '../../models/patient.dart';
+import '../../models/prediction_input.dart';
+import '../../services/patient_service.dart';
+import '../../services/prediction_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/breakpoints.dart';
+import '../../widgets/add_patient_dialog.dart';
 import '../../widgets/alert_strip.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/step_indicator.dart';
 
-const _steps = ['Patient', 'Measurements', 'History', 'Result'];
+const _steps = ['Patient', 'Measurements', 'Risk factors', 'Labs & notes', 'Result'];
 
 class NewAssessmentScreen extends StatefulWidget {
   const NewAssessmentScreen({super.key});
@@ -21,13 +25,36 @@ class NewAssessmentScreen extends StatefulWidget {
 
 class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
   int _step = 0;
+  bool _submitting = false;
+  String? _submitError;
 
   String? _patientId;
+  String? _patientName;
+
+  // Measurements
+  final _maternalAgeController = TextEditingController(text: '28');
   final _gestAgeController = TextEditingController(text: '28');
   final _systolicController = TextEditingController(text: '120');
   final _diastolicController = TextEditingController(text: '78');
   final _weightController = TextEditingController(text: '68');
   final _heightController = TextEditingController(text: '162');
+
+  // Risk factors — these map 1:1 to the model's inputs.
+  bool _previousPreeclampsia = false;
+  bool _gestationalDiabetes = false;
+  bool _chronicHypertension = false;
+  bool _familyHistory = false;
+  bool _smoking = false;
+  bool _alcohol = false;
+  bool _physicalActivity = false;
+  bool _employmentStatus = false;
+
+  // Labs — these map 1:1 to the model's inputs.
+  final _hemoglobinController = TextEditingController(text: '12.0');
+  final _plateletController = TextEditingController(text: '250');
+  final _creatinineController = TextEditingController(text: '0.8');
+
+  // Clinical notes only — the model does not consume these.
   String _protein = 'Negative';
   String _oedema = 'None';
   String _dangerSigns = 'None reported';
@@ -40,12 +67,28 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // BMI is derived from these, so redraw whenever either changes.
+    _weightController.addListener(_onBmiInputChanged);
+    _heightController.addListener(_onBmiInputChanged);
+  }
+
+  void _onBmiInputChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _weightController.removeListener(_onBmiInputChanged);
+    _heightController.removeListener(_onBmiInputChanged);
+    _maternalAgeController.dispose();
     _gestAgeController.dispose();
     _systolicController.dispose();
     _diastolicController.dispose();
     _weightController.dispose();
     _heightController.dispose();
+    _hemoglobinController.dispose();
+    _plateletController.dispose();
+    _creatinineController.dispose();
     super.dispose();
   }
 
@@ -54,12 +97,56 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
     setState(() => _step -= 1);
   }
 
-  void _next() {
+  Future<void> _next() async {
     if (_step == _steps.length - 2) {
-      context.go('/assess/result');
+      await _runPrediction();
       return;
     }
     setState(() => _step += 1);
+  }
+
+  Future<void> _runPrediction() async {
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+
+    final input = PredictionInput(
+      maternalAge: double.tryParse(_maternalAgeController.text) ?? 0,
+      bmi: _bmi,
+      systolicBp: double.tryParse(_systolicController.text) ?? 0,
+      diastolicBp: double.tryParse(_diastolicController.text) ?? 0,
+      previousPreeclampsia: _previousPreeclampsia,
+      gestationalDiabetes: _gestationalDiabetes,
+      chronicHypertension: _chronicHypertension,
+      familyHistory: _familyHistory,
+      smoking: _smoking,
+      alcohol: _alcohol,
+      physicalActivity: _physicalActivity,
+      employmentStatus: _employmentStatus,
+      hemoglobinLevel: double.tryParse(_hemoglobinController.text) ?? 0,
+      plateletCount: double.tryParse(_plateletController.text) ?? 0,
+      creatinineLevel: double.tryParse(_creatinineController.text) ?? 0,
+    );
+
+    try {
+      final result = await PredictionService().predict(
+        input,
+        patientId: _patientId,
+        patientName: _patientName,
+        gestationalWeek: int.tryParse(_gestAgeController.text),
+        proteinUrine: _protein,
+        oedema: _oedema,
+        dangerSigns: _dangerSigns,
+      );
+      if (!mounted) return;
+      context.go('/assess/result', extra: result);
+    } on PredictionApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _submitError = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -89,6 +176,14 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
                     StepIndicator(steps: _steps, currentIndex: _step),
                     const SizedBox(height: 28),
                     _stepBody(phone),
+                    if (_submitError != null) ...[
+                      const SizedBox(height: 16),
+                      AlertStrip(
+                        icon: Icons.error_outline_rounded,
+                        tone: AlertTone.danger,
+                        text: _submitError!,
+                      ),
+                    ],
                     const SizedBox(height: 28),
                     _footer(phone),
                   ],
@@ -104,10 +199,17 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
   Widget _stepBody(bool phone) {
     switch (_step) {
       case 0:
-        return _PatientStep(patientId: _patientId, onChanged: (v) => setState(() => _patientId = v));
+        return _PatientStep(
+          patientId: _patientId,
+          onChanged: (id, name) => setState(() {
+            _patientId = id;
+            _patientName = name;
+          }),
+        );
       case 1:
         return _MeasurementsStep(
           phone: phone,
+          maternalAge: _maternalAgeController,
           gestAge: _gestAgeController,
           systolic: _systolicController,
           diastolic: _diastolicController,
@@ -115,9 +217,31 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
           height: _heightController,
           bmi: _bmi,
         );
+      case 2:
+        return _RiskFactorsStep(
+          previousPreeclampsia: _previousPreeclampsia,
+          gestationalDiabetes: _gestationalDiabetes,
+          chronicHypertension: _chronicHypertension,
+          familyHistory: _familyHistory,
+          smoking: _smoking,
+          alcohol: _alcohol,
+          physicalActivity: _physicalActivity,
+          employmentStatus: _employmentStatus,
+          onPreviousPreeclampsia: (v) => setState(() => _previousPreeclampsia = v),
+          onGestationalDiabetes: (v) => setState(() => _gestationalDiabetes = v),
+          onChronicHypertension: (v) => setState(() => _chronicHypertension = v),
+          onFamilyHistory: (v) => setState(() => _familyHistory = v),
+          onSmoking: (v) => setState(() => _smoking = v),
+          onAlcohol: (v) => setState(() => _alcohol = v),
+          onPhysicalActivity: (v) => setState(() => _physicalActivity = v),
+          onEmploymentStatus: (v) => setState(() => _employmentStatus = v),
+        );
       default:
-        return _HistoryStep(
+        return _LabsAndNotesStep(
           phone: phone,
+          hemoglobin: _hemoglobinController,
+          platelet: _plateletController,
+          creatinine: _creatinineController,
           protein: _protein,
           oedema: _oedema,
           dangerSigns: _dangerSigns,
@@ -130,8 +254,14 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
 
   Widget _footer(bool phone) {
     final primary = ElevatedButton(
-      onPressed: _next,
-      child: Text(_step == _steps.length - 2 ? 'Run prediction →' : 'Continue →'),
+      onPressed: _submitting ? null : _next,
+      child: _submitting
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+          : Text(_step == _steps.length - 2 ? 'Run prediction →' : 'Continue →'),
     );
 
     if (phone) {
@@ -140,7 +270,7 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
           SizedBox(width: double.infinity, child: primary),
           if (_step > 0) ...[
             const SizedBox(height: 10),
-            SizedBox(width: double.infinity, child: OutlinedButton(onPressed: _back, child: const Text('← Back'))),
+            SizedBox(width: double.infinity, child: OutlinedButton(onPressed: _submitting ? null : _back, child: const Text('← Back'))),
           ],
         ],
       );
@@ -149,7 +279,7 @@ class _NewAssessmentScreenState extends State<NewAssessmentScreen> {
     return Row(
       children: [
         if (_step > 0)
-          OutlinedButton(onPressed: _back, child: const Text('← Back'))
+          OutlinedButton(onPressed: _submitting ? null : _back, child: const Text('← Back'))
         else
           const SizedBox(),
         const Spacer(),
@@ -212,27 +342,83 @@ class _FieldGrid extends StatelessWidget {
   }
 }
 
-class _PatientStep extends StatelessWidget {
+class _PatientStep extends StatefulWidget {
   final String? patientId;
-  final ValueChanged<String?> onChanged;
+  final void Function(String id, String name) onChanged;
   const _PatientStep({required this.patientId, required this.onChanged});
 
   @override
+  State<_PatientStep> createState() => _PatientStepState();
+}
+
+class _PatientStepState extends State<_PatientStep> {
+  late Future<List<Patient>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = PatientService().fetchPatients();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return _StepField(
-      label: 'Patient',
-      child: _Dropdown(
-        hint: 'Select a patient',
-        value: patientId,
-        items: MockData.patients.map((p) => (value: p.id, label: '${p.name} · wk ${p.gestationalWeek}')).toList(),
-        onChanged: onChanged,
-      ),
+    return FutureBuilder<List<Patient>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return AlertStrip(
+            icon: Icons.error_outline_rounded,
+            tone: AlertTone.danger,
+            text: 'Could not load patients: ${snapshot.error}',
+          );
+        }
+        final patients = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _StepField(
+              label: 'Patient',
+              child: _Dropdown(
+                hint: 'Select a patient',
+                value: widget.patientId,
+                items: patients.map((p) => (value: p.id, label: '${p.name} · wk ${p.gestationalWeek}')).toList(),
+                onChanged: (id) {
+                  if (id == null) return;
+                  final patient = patients.firstWhere((p) => p.id == id);
+                  widget.onChanged(patient.id, patient.name);
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => showDialog(
+                context: context,
+                builder: (_) => AddPatientDialog(
+                  onAdded: (patient) {
+                    setState(() => _future = PatientService().fetchPatients());
+                    widget.onChanged(patient.id, patient.name);
+                  },
+                ),
+              ),
+              icon: const Icon(Icons.person_add_alt_1_outlined, size: 16),
+              label: const Text('Add new patient'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
 class _MeasurementsStep extends StatelessWidget {
   final bool phone;
+  final TextEditingController maternalAge;
   final TextEditingController gestAge;
   final TextEditingController systolic;
   final TextEditingController diastolic;
@@ -242,6 +428,7 @@ class _MeasurementsStep extends StatelessWidget {
 
   const _MeasurementsStep({
     required this.phone,
+    required this.maternalAge,
     required this.gestAge,
     required this.systolic,
     required this.diastolic,
@@ -255,6 +442,7 @@ class _MeasurementsStep extends StatelessWidget {
     return _FieldGrid(
       phone: phone,
       children: [
+        _StepField(label: 'Maternal age (years)', child: _Input(controller: maternalAge)),
         _StepField(label: 'Gestational age (weeks)', child: _Input(controller: gestAge)),
         _StepField(label: 'Systolic BP (mmHg)', child: _Input(controller: systolic)),
         _StepField(label: 'Diastolic BP (mmHg)', child: _Input(controller: diastolic)),
@@ -266,8 +454,96 @@ class _MeasurementsStep extends StatelessWidget {
   }
 }
 
-class _HistoryStep extends StatelessWidget {
+class _RiskFactorsStep extends StatelessWidget {
+  final bool previousPreeclampsia;
+  final bool gestationalDiabetes;
+  final bool chronicHypertension;
+  final bool familyHistory;
+  final bool smoking;
+  final bool alcohol;
+  final bool physicalActivity;
+  final bool employmentStatus;
+  final ValueChanged<bool> onPreviousPreeclampsia;
+  final ValueChanged<bool> onGestationalDiabetes;
+  final ValueChanged<bool> onChronicHypertension;
+  final ValueChanged<bool> onFamilyHistory;
+  final ValueChanged<bool> onSmoking;
+  final ValueChanged<bool> onAlcohol;
+  final ValueChanged<bool> onPhysicalActivity;
+  final ValueChanged<bool> onEmploymentStatus;
+
+  const _RiskFactorsStep({
+    required this.previousPreeclampsia,
+    required this.gestationalDiabetes,
+    required this.chronicHypertension,
+    required this.familyHistory,
+    required this.smoking,
+    required this.alcohol,
+    required this.physicalActivity,
+    required this.employmentStatus,
+    required this.onPreviousPreeclampsia,
+    required this.onGestationalDiabetes,
+    required this.onChronicHypertension,
+    required this.onFamilyHistory,
+    required this.onSmoking,
+    required this.onAlcohol,
+    required this.onPhysicalActivity,
+    required this.onEmploymentStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('History & lifestyle', style: AppTextStyles.label(context)),
+        const SizedBox(height: 6),
+        _CheckboxField(label: 'Previous preeclampsia', value: previousPreeclampsia, onChanged: onPreviousPreeclampsia),
+        _CheckboxField(label: 'Gestational diabetes', value: gestationalDiabetes, onChanged: onGestationalDiabetes),
+        _CheckboxField(label: 'Chronic hypertension', value: chronicHypertension, onChanged: onChronicHypertension),
+        _CheckboxField(label: 'Family history', value: familyHistory, onChanged: onFamilyHistory),
+        _CheckboxField(label: 'Smoking', value: smoking, onChanged: onSmoking),
+        _CheckboxField(label: 'Alcohol', value: alcohol, onChanged: onAlcohol),
+        _CheckboxField(label: 'Regular physical activity', value: physicalActivity, onChanged: onPhysicalActivity),
+        _CheckboxField(label: 'Employed', value: employmentStatus, onChanged: onEmploymentStatus),
+      ],
+    );
+  }
+}
+
+class _CheckboxField extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _CheckboxField({required this.label, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusButton),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: (v) => onChanged(v ?? false),
+              activeColor: AppColors.of(context).tealPrimary,
+            ),
+            Expanded(child: Text(label, style: AppTextStyles.body(context))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LabsAndNotesStep extends StatelessWidget {
   final bool phone;
+  final TextEditingController hemoglobin;
+  final TextEditingController platelet;
+  final TextEditingController creatinine;
   final String protein;
   final String oedema;
   final String dangerSigns;
@@ -275,8 +551,11 @@ class _HistoryStep extends StatelessWidget {
   final ValueChanged<String> onOedema;
   final ValueChanged<String> onDangerSigns;
 
-  const _HistoryStep({
+  const _LabsAndNotesStep({
     required this.phone,
+    required this.hemoglobin,
+    required this.platelet,
+    required this.creatinine,
     required this.protein,
     required this.oedema,
     required this.dangerSigns,
@@ -290,6 +569,19 @@ class _HistoryStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text('Laboratory results', style: AppTextStyles.label(context)),
+        const SizedBox(height: 6),
+        _FieldGrid(
+          phone: phone,
+          children: [
+            _StepField(label: 'Hemoglobin (g/dL)', child: _Input(controller: hemoglobin)),
+            _StepField(label: 'Platelet count (10³/µL)', child: _Input(controller: platelet)),
+            _StepField(label: 'Creatinine (mg/dL)', child: _Input(controller: creatinine)),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text('Clinical notes', style: AppTextStyles.label(context)),
+        const SizedBox(height: 6),
         _FieldGrid(
           phone: phone,
           children: [
@@ -338,7 +630,7 @@ class _HistoryStep extends StatelessWidget {
         const SizedBox(height: 8),
         const AlertStrip(
           icon: Icons.info_outline_rounded,
-          text: 'These fields map directly to the prediction model\'s features. Missing values are imputed automatically and flagged in the result.',
+          text: 'Protein, oedema, and danger signs are kept as clinical notes for the record. The prediction model does not use them as inputs.',
         ),
       ],
     );

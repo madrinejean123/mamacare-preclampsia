@@ -38,9 +38,25 @@ extension RiskLevelX on RiskLevel {
     }
   }
 
+  /// Mirrors the interpretation text from the screening model's own tool,
+  /// so the wording matches regardless of where the result is shown.
+  String get description {
+    switch (this) {
+      case RiskLevel.low:
+        return 'Clinical profile is consistent with normal pregnancy.';
+      case RiskLevel.moderate:
+        return 'Patient shows several clinical indicators. Increased monitoring is recommended.';
+      case RiskLevel.high:
+        return 'High correlation with historical preeclampsia cases. Immediate specialist review recommended.';
+    }
+  }
+
+  /// Matches the screening model's own category boundaries (api.py's
+  /// categorize()) — kept in sync so a patient's badge never disagrees
+  /// with the category shown on their own assessment result.
   static RiskLevel fromPercent(double percent) {
-    if (percent >= 55) return RiskLevel.high;
-    if (percent >= 20) return RiskLevel.moderate;
+    if (percent >= 70) return RiskLevel.high;
+    if (percent >= 30) return RiskLevel.moderate;
     return RiskLevel.low;
   }
 }

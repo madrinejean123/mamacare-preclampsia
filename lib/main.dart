@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'router/app_router.dart';
+import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_controller.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.instance.restore();
   runApp(const MamaSafeApp());
 }
 

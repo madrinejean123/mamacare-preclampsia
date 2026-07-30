@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../theme/app_colors.dart';
+import '../../services/auth_service.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/alert_strip.dart';
 import 'auth_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,7 +14,37 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _rememberMe = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await AuthService.instance.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      context.go('/dashboard');
+    } on AuthApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,42 +57,26 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 6),
           Text('Log in to your clinic workspace.', style: AppTextStyles.bodySmall(context)),
           const SizedBox(height: 24),
-          const AuthField(label: 'Email', hint: 'you@clinic.org', keyboardType: TextInputType.emailAddress),
-          const SizedBox(height: 16),
-          const AuthField(label: 'Password', hint: '••••••••', obscure: true),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              InkWell(
-                onTap: () => setState(() => _rememberMe = !_rememberMe),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: Checkbox(
-                        value: _rememberMe,
-                        onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                        activeColor: AppColors.of(context).tealPrimary,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text('Remember me', style: AppTextStyles.bodySmall(context)),
-                  ],
-                ),
-              ),
-              TextButton(onPressed: () {}, child: const Text('Forgot password?')),
-            ],
+          AuthField(
+            label: 'Email',
+            hint: 'you@clinic.org',
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
           ),
+          const SizedBox(height: 16),
+          AuthField(label: 'Password', hint: '••••••••', controller: _passwordController, obscure: true),
+          if (_error != null) ...[
+            const SizedBox(height: 16),
+            AlertStrip(icon: Icons.error_outline_rounded, tone: AlertTone.danger, text: _error!),
+          ],
           const SizedBox(height: 22),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => context.go('/dashboard'),
-              child: const Text('Log in'),
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Log in'),
             ),
           ),
           const SizedBox(height: 20),

@@ -2,22 +2,38 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/mock_data.dart';
+import '../../models/patient.dart';
+import '../../models/stats.dart';
+import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/breakpoints.dart';
+import '../../widgets/alert_strip.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/metric_card.dart';
 import '../../widgets/risk_badge.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late Future<(List<Patient>, ClinicStats)> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = PatientService();
+    _future = (service.fetchPatients(), service.fetchStats()).wait;
+  }
 
   @override
   Widget build(BuildContext context) {
     final phone = isPhone(context);
-    final attention = MockData.patients.take(4).toList();
 
     return AppScaffold(
       currentRoute: '/dashboard',
@@ -26,12 +42,38 @@ class DashboardScreen extends StatelessWidget {
         children: [
           _Header(phone: phone),
           const SizedBox(height: AppSpacing.sectionGap),
-          _MetricsRow(phone: phone),
-          const SizedBox(height: AppSpacing.cardGap),
-          _ContentRow(
-            phone: phone,
-            chart: const _AssessmentsChartCard(),
-            attention: _AttentionCard(patients: attention),
+          FutureBuilder<(List<Patient>, ClinicStats)>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 60),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return AlertStrip(
+                  icon: Icons.error_outline_rounded,
+                  tone: AlertTone.danger,
+                  text: 'Could not load dashboard data: ${snapshot.error}',
+                );
+              }
+              final (patients, stats) = snapshot.data!;
+              final attention = [...patients]..sort((a, b) => b.riskPercent.compareTo(a.riskPercent));
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _MetricsRow(phone: phone, stats: stats),
+                  const SizedBox(height: AppSpacing.cardGap),
+                  _ContentRow(
+                    phone: phone,
+                    chart: _AssessmentsChartCard(weekly: stats.weeklyAssessments),
+                    attention: _AttentionCard(patients: attention.take(4).toList()),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -50,7 +92,7 @@ class _Header extends StatelessWidget {
       children: [
         Text('Mulago Antenatal Clinic', style: AppTextStyles.caption(context)),
         const SizedBox(height: 4),
-        Text('Good morning, Amina', style: AppTextStyles.screenTitle(context)),
+        Text('Good morning', style: AppTextStyles.screenTitle(context)),
       ],
     );
 
@@ -61,12 +103,6 @@ class _Header extends StatelessWidget {
           onPressed: () => context.go('/assess'),
           icon: const Icon(Icons.add, size: 18),
           label: const Text('New assessment'),
-        ),
-        const SizedBox(width: 12),
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: AppColors.of(context).tealLight,
-          child: Text('AN', style: TextStyle(color: AppColors.of(context).tealPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
         ),
       ],
     );
@@ -90,15 +126,16 @@ class _Header extends StatelessWidget {
 
 class _MetricsRow extends StatelessWidget {
   final bool phone;
-  const _MetricsRow({required this.phone});
+  final ClinicStats stats;
+  const _MetricsRow({required this.phone, required this.stats});
 
   @override
   Widget build(BuildContext context) {
     final cards = [
-      const MetricCard(label: 'Active patients', value: '148', delta: '12 this month'),
-      const MetricCard(label: 'Assessments this week', value: '36', delta: '8%'),
-      MetricCard(label: 'High-risk flagged', value: '7', valueColor: AppColors.of(context).riskHigh),
-      const MetricCard(label: 'Referrals sent', value: '4', delta: null),
+      MetricCard(label: 'Active patients', value: '${stats.activePatients}'),
+      MetricCard(label: 'Assessments this week', value: '${stats.assessmentsThisWeek}'),
+      MetricCard(label: 'High-risk flagged', value: '${stats.highRiskCount}', valueColor: AppColors.of(context).riskHigh),
+      const MetricCard(label: 'Referrals sent', value: 'Not tracked yet'),
     ];
 
     if (phone) {
@@ -152,18 +189,8 @@ class _ContentRow extends StatelessWidget {
 }
 
 class _AssessmentsChartCard extends StatelessWidget {
-  const _AssessmentsChartCard();
-
-  static const _weeklyData = [
-    (low: 3.0, moderate: 1.0, high: 0.0),
-    (low: 4.0, moderate: 1.0, high: 1.0),
-    (low: 5.0, moderate: 2.0, high: 0.0),
-    (low: 4.0, moderate: 2.0, high: 1.0),
-    (low: 6.0, moderate: 1.0, high: 1.0),
-    (low: 5.0, moderate: 3.0, high: 1.0),
-    (low: 6.0, moderate: 2.0, high: 2.0),
-    (low: 5.0, moderate: 3.0, high: 2.0),
-  ];
+  final List<WeekBucket> weekly;
+  const _AssessmentsChartCard({required this.weekly});
 
   @override
   Widget build(BuildContext context) {
@@ -216,19 +243,19 @@ class _AssessmentsChartCard extends StatelessWidget {
                   ),
                 ),
                 barGroups: [
-                  for (var i = 0; i < _weeklyData.length; i++)
+                  for (var i = 0; i < weekly.length; i++)
                     BarChartGroupData(
                       x: i,
                       barRods: [
                         BarChartRodData(
-                          toY: _weeklyData[i].low + _weeklyData[i].moderate + _weeklyData[i].high,
+                          toY: (weekly[i].low + weekly[i].moderate + weekly[i].high).toDouble(),
                           width: phone ? 16 : 22,
                           borderRadius: BorderRadius.circular(4),
                           rodStackItems: [
-                            BarChartRodStackItem(0, _weeklyData[i].low, AppColors.of(context).riskLow),
-                            BarChartRodStackItem(_weeklyData[i].low, _weeklyData[i].low + _weeklyData[i].moderate, AppColors.of(context).riskModerate),
-                            BarChartRodStackItem(_weeklyData[i].low + _weeklyData[i].moderate,
-                                _weeklyData[i].low + _weeklyData[i].moderate + _weeklyData[i].high, AppColors.of(context).riskHigh),
+                            BarChartRodStackItem(0, weekly[i].low.toDouble(), AppColors.of(context).riskLow),
+                            BarChartRodStackItem(weekly[i].low.toDouble(), (weekly[i].low + weekly[i].moderate).toDouble(), AppColors.of(context).riskModerate),
+                            BarChartRodStackItem((weekly[i].low + weekly[i].moderate).toDouble(),
+                                (weekly[i].low + weekly[i].moderate + weekly[i].high).toDouble(), AppColors.of(context).riskHigh),
                           ],
                         ),
                       ],
@@ -271,7 +298,7 @@ class _LegendDot extends StatelessWidget {
 }
 
 class _AttentionCard extends StatelessWidget {
-  final List patients;
+  final List<Patient> patients;
   const _AttentionCard({required this.patients});
 
   @override
@@ -288,30 +315,33 @@ class _AttentionCard extends StatelessWidget {
         children: [
           Text('Needs attention today', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 14),
-          for (final p in patients) ...[
-            InkWell(
-              onTap: () => context.go('/patients/${p.id}'),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 15,
-                      backgroundColor: AppColors.of(context).tealLight,
-                      child: Text(p.initials, style: AppTextStyles.caption(context, color: AppColors.of(context).tealPrimary).copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text('${p.name} · wk ${p.gestationalWeek}', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).ink), overflow: TextOverflow.ellipsis),
-                    ),
-                    RiskBadge(level: p.riskLevel, percent: p.riskPercent),
-                  ],
+          if (patients.isEmpty)
+            Text('No patients yet.', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).inkSoft))
+          else
+            for (final p in patients) ...[
+              InkWell(
+                onTap: () => context.go('/patients/${p.id}'),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 15,
+                        backgroundColor: AppColors.of(context).tealLight,
+                        child: Text(p.initials, style: AppTextStyles.caption(context, color: AppColors.of(context).tealPrimary).copyWith(fontWeight: FontWeight.w700)),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text('${p.name} · wk ${p.gestationalWeek}', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).ink), overflow: TextOverflow.ellipsis),
+                      ),
+                      RiskBadge(level: p.riskLevel, percent: p.riskPercent),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (p != patients.last) Divider(height: 1, color: AppColors.of(context).line),
-          ],
+              if (p != patients.last) Divider(height: 1, color: AppColors.of(context).line),
+            ],
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,

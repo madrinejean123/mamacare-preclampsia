@@ -1,10 +1,13 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../models/stats.dart';
+import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../theme/breakpoints.dart';
+import '../../widgets/alert_strip.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/metric_card.dart';
 
@@ -17,13 +20,13 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   String _period = 'This month';
+  late Future<ClinicStats> _future;
 
-  static const _referrals = [
-    (patient: 'Grace Achieng', facility: 'Mulago NRH', date: 'Jul 26', status: 'accepted'),
-    (patient: 'Sarah Namuli', facility: 'Mulago NRH', date: 'Jul 25', status: 'pending'),
-    (patient: 'Betty Auma', facility: 'Kawempe HC IV', date: 'Jul 18', status: 'accepted'),
-    (patient: 'Doreen Apio', facility: 'Kawempe HC IV', date: 'Jul 12', status: 'accepted'),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _future = PatientService().fetchStats();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,23 +39,51 @@ class _ReportsScreenState extends State<ReportsScreen> {
         children: [
           _Header(phone: phone, period: _period, onPeriodChanged: (v) => setState(() => _period = v)),
           const SizedBox(height: AppSpacing.sectionGap),
-          _MetricsRow(phone: phone),
-          const SizedBox(height: AppSpacing.cardGap),
-          if (phone)
-            const Column(
-              children: [_DistributionCard(), SizedBox(height: AppSpacing.cardGap), _ReferralsCard(referrals: _referrals)],
-            )
-          else
-            const IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          FutureBuilder<ClinicStats>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 60),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return AlertStrip(
+                  icon: Icons.error_outline_rounded,
+                  tone: AlertTone.danger,
+                  text: 'Could not load report data: ${snapshot.error}',
+                );
+              }
+              final stats = snapshot.data!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 5, child: _DistributionCard()),
-                  SizedBox(width: AppSpacing.cardGap),
-                  Expanded(flex: 6, child: _ReferralsCard(referrals: _referrals)),
+                  _MetricsRow(phone: phone, stats: stats),
+                  const SizedBox(height: AppSpacing.cardGap),
+                  if (phone)
+                    Column(
+                      children: [
+                        _DistributionCard(stats: stats),
+                        const SizedBox(height: AppSpacing.cardGap),
+                        const _ReferralsCard(),
+                      ],
+                    )
+                  else
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(flex: 5, child: _DistributionCard(stats: stats)),
+                          const SizedBox(width: AppSpacing.cardGap),
+                          const Expanded(flex: 6, child: _ReferralsCard()),
+                        ],
+                      ),
+                    ),
                 ],
-              ),
-            ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -101,15 +132,6 @@ class _Header extends StatelessWidget {
       ),
     );
 
-    final actions = Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.file_download_outlined, size: 16), label: const Text('Export CSV')),
-        ElevatedButton(onPressed: () {}, child: const Text('Print summary')),
-      ],
-    );
-
     if (phone) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,8 +139,6 @@ class _Header extends StatelessWidget {
           crumb,
           const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: periodSelector),
-          const SizedBox(height: 10),
-          actions,
         ],
       );
     }
@@ -127,8 +147,6 @@ class _Header extends StatelessWidget {
       children: [
         Expanded(child: crumb),
         periodSelector,
-        const SizedBox(width: 12),
-        actions,
       ],
     );
   }
@@ -136,39 +154,48 @@ class _Header extends StatelessWidget {
 
 class _MetricsRow extends StatelessWidget {
   final bool phone;
-  const _MetricsRow({required this.phone});
+  final ClinicStats stats;
+  const _MetricsRow({required this.phone, required this.stats});
 
   @override
   Widget build(BuildContext context) {
+    final cards = [
+      MetricCard(label: 'Assessments run', value: '${stats.totalAssessments}'),
+      const MetricCard(label: 'Detection precision (audited)', value: 'Not tracked yet'),
+      const MetricCard(label: 'Avg. weeks gained', value: 'Not tracked yet'),
+    ];
+
     if (phone) {
-      return const Column(
+      return Column(
         children: [
-          MetricCard(label: 'Assessments run', value: '142', delta: '18% vs June'),
-          SizedBox(height: AppSpacing.cardGap),
-          MetricCard(label: 'Detection precision (audited)', value: '81%'),
-          SizedBox(height: AppSpacing.cardGap),
-          MetricCard(label: 'Avg. weeks gained', value: '4.6'),
+          for (final c in cards) ...[c, const SizedBox(height: AppSpacing.cardGap)],
         ],
       );
     }
 
-    return const Row(
+    return Row(
       children: [
-        Expanded(child: MetricCard(label: 'Assessments run', value: '142', delta: '18% vs June')),
-        SizedBox(width: AppSpacing.cardGap),
-        Expanded(child: MetricCard(label: 'Detection precision (audited)', value: '81%')),
-        SizedBox(width: AppSpacing.cardGap),
-        Expanded(child: MetricCard(label: 'Avg. weeks gained', value: '4.6')),
+        for (var i = 0; i < cards.length; i++) ...[
+          Expanded(child: cards[i]),
+          if (i != cards.length - 1) const SizedBox(width: AppSpacing.cardGap),
+        ],
       ],
     );
   }
 }
 
 class _DistributionCard extends StatelessWidget {
-  const _DistributionCard();
+  final ClinicStats stats;
+  const _DistributionCard({required this.stats});
 
   @override
   Widget build(BuildContext context) {
+    final low = stats.riskDistribution['low'] ?? 0;
+    final moderate = stats.riskDistribution['moderate'] ?? 0;
+    final high = stats.riskDistribution['high'] ?? 0;
+    final total = low + moderate + high;
+    String pct(int n) => total == 0 ? '0%' : '${(n / total * 100).round()}%';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
       decoration: BoxDecoration(
@@ -179,40 +206,46 @@ class _DistributionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Risk distribution · July', style: AppTextStyles.cardHeading(context)),
+          Text('Risk distribution (current)', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 200,
-            child: Row(
-              children: [
-                Expanded(
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 46,
-                      sections: [
-                        PieChartSectionData(value: 68, color: AppColors.of(context).riskLow, radius: 22, showTitle: false),
-                        PieChartSectionData(value: 24, color: AppColors.of(context).riskModerate, radius: 22, showTitle: false),
-                        PieChartSectionData(value: 8, color: AppColors.of(context).riskHigh, radius: 22, showTitle: false),
-                      ],
+          if (total == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Text('No assessments yet.', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).inkSoft)),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 3,
+                        centerSpaceRadius: 46,
+                        sections: [
+                          PieChartSectionData(value: low.toDouble(), color: AppColors.of(context).riskLow, radius: 22, showTitle: false),
+                          PieChartSectionData(value: moderate.toDouble(), color: AppColors.of(context).riskModerate, radius: 22, showTitle: false),
+                          PieChartSectionData(value: high.toDouble(), color: AppColors.of(context).riskHigh, radius: 22, showTitle: false),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _LegendRow(color: AppColors.of(context).riskLow, label: 'Low', value: '68%'),
-                    const SizedBox(height: 10),
-                    _LegendRow(color: AppColors.of(context).riskModerate, label: 'Moderate', value: '24%'),
-                    const SizedBox(height: 10),
-                    _LegendRow(color: AppColors.of(context).riskHigh, label: 'High', value: '8%'),
-                  ],
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _LegendRow(color: AppColors.of(context).riskLow, label: 'Low', value: pct(low)),
+                      const SizedBox(height: 10),
+                      _LegendRow(color: AppColors.of(context).riskModerate, label: 'Moderate', value: pct(moderate)),
+                      const SizedBox(height: 10),
+                      _LegendRow(color: AppColors.of(context).riskHigh, label: 'High', value: pct(high)),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -240,8 +273,7 @@ class _LegendRow extends StatelessWidget {
 }
 
 class _ReferralsCard extends StatelessWidget {
-  final List referrals;
-  const _ReferralsCard({required this.referrals});
+  const _ReferralsCard();
 
   @override
   Widget build(BuildContext context) {
@@ -257,25 +289,11 @@ class _ReferralsCard extends StatelessWidget {
         children: [
           Text('Recent referrals', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 10),
-          for (final r in referrals) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('${r.patient} → ${r.facility}', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).ink), overflow: TextOverflow.ellipsis),
-                  ),
-                  Text(
-                    '${r.date} · ${r.status}',
-                    style: AppTextStyles.caption(context, 
-                      color: r.status == 'accepted' ? AppColors.of(context).riskLow : AppColors.of(context).riskModerate,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (r != referrals.last) Divider(height: 1, color: AppColors.of(context).line),
-          ],
+          AlertStrip(
+            icon: Icons.info_outline_rounded,
+            text: 'Referral tracking isn\'t built yet — there\'s no referrals table in the database. '
+                'The "Refer patient" button on a result screen doesn\'t record anything today.',
+          ),
         ],
       ),
     );

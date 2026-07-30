@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../data/mock_data.dart';
 import '../../models/patient.dart';
+import '../../services/patient_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
@@ -13,28 +13,63 @@ import '../../widgets/app_scaffold.dart';
 import '../../widgets/risk_badge.dart';
 import '../../widgets/week_ribbon.dart';
 
-class PatientProfileScreen extends StatelessWidget {
+class PatientProfileScreen extends StatefulWidget {
   final String patientId;
   const PatientProfileScreen({super.key, required this.patientId});
 
   @override
+  State<PatientProfileScreen> createState() => _PatientProfileScreenState();
+}
+
+class _PatientProfileScreenState extends State<PatientProfileScreen> {
+  late Future<Patient> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = PatientService().fetchPatient(widget.patientId);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final patient = MockData.patientById(patientId);
     final phone = isPhone(context);
 
     return AppScaffold(
       currentRoute: '/patients',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _TitleRow(patient: patient, phone: phone),
-          const SizedBox(height: AppSpacing.sectionGap),
-          _MetricsRow(patient: patient, phone: phone),
-          const SizedBox(height: AppSpacing.cardGap),
-          _TimelineAndHistory(patient: patient, phone: phone),
-          const SizedBox(height: AppSpacing.cardGap),
-          _NotesCard(patient: patient),
-        ],
+      child: FutureBuilder<Patient>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 60),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasError) {
+            return AlertStrip(
+              icon: Icons.error_outline_rounded,
+              tone: AlertTone.danger,
+              text: 'Could not load this patient: ${snapshot.error}',
+            );
+          }
+          final patient = snapshot.data!;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TitleRow(patient: patient, phone: phone),
+              const SizedBox(height: AppSpacing.sectionGap),
+              _MetricsRow(patient: patient, phone: phone),
+              const SizedBox(height: AppSpacing.cardGap),
+              _TimelineAndHistory(patient: patient, phone: phone),
+              const SizedBox(height: AppSpacing.cardGap),
+              _NotesCard(patient: patient, onNoteAdded: () => setState(_load)),
+            ],
+          );
+        },
       ),
     );
   }
@@ -100,12 +135,15 @@ class _MetricsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final edd = DateFormat('MMM d, y').format(patient.edd);
+    final edd = patient.edd != null ? DateFormat('MMM d, y').format(patient.edd!) : '—';
     final cards = [
       _SmallMetric(label: 'Age', value: '${patient.age}'),
       _SmallMetric(label: 'Gestational week', value: 'Wk ${patient.gestationalWeek}', caption: 'EDD $edd'),
       _SmallMetric(label: 'Gravida / Para', value: 'G${patient.gravida} P${patient.para}'),
-      _SmallMetric(label: 'Latest BP', value: '${patient.systolicBp}/${patient.diastolicBp}'),
+      _SmallMetric(
+        label: 'Latest BP',
+        value: patient.assessments.isEmpty ? '—' : '${patient.systolicBp}/${patient.diastolicBp}',
+      ),
     ];
 
     if (phone) {
@@ -250,35 +288,82 @@ class _HistoryCard extends StatelessWidget {
         children: [
           Text('Assessment history', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 10),
-          for (final a in assessments) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 9),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${DateFormat('MMM d, y').format(a.date)} · wk ${a.gestationalWeek}',
-                      style: AppTextStyles.bodySmall(context, color: AppColors.of(context).ink),
+          if (assessments.isEmpty)
+            Text('No assessments yet.', style: AppTextStyles.bodySmall(context, color: AppColors.of(context).inkSoft))
+          else
+            for (final a in assessments) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${DateFormat('MMM d, y').format(a.date)} · wk ${a.gestationalWeek}',
+                        style: AppTextStyles.bodySmall(context, color: AppColors.of(context).ink),
+                      ),
                     ),
-                  ),
-                  RiskBadge(level: a.riskLevel, percent: a.riskPercent),
-                ],
+                    RiskBadge(level: a.riskLevel, percent: a.riskPercent),
+                  ],
+                ),
               ),
-            ),
-            if (a != assessments.last) Divider(height: 1, color: AppColors.of(context).line),
-          ],
+              if (a != assessments.last) Divider(height: 1, color: AppColors.of(context).line),
+            ],
         ],
       ),
     );
   }
 }
 
-class _NotesCard extends StatelessWidget {
+class _NotesCard extends StatefulWidget {
   final Patient patient;
-  const _NotesCard({required this.patient});
+  final VoidCallback onNoteAdded;
+  const _NotesCard({required this.patient, required this.onNoteAdded});
+
+  @override
+  State<_NotesCard> createState() => _NotesCardState();
+}
+
+class _NotesCardState extends State<_NotesCard> {
+  final _authorController = TextEditingController();
+  final _textController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _authorController.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_authorController.text.trim().isEmpty || _textController.text.trim().isEmpty) {
+      setState(() => _error = 'Author and note text are both required.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await PatientService().addNote(
+        widget.patient.id,
+        author: _authorController.text.trim(),
+        text: _textController.text.trim(),
+      );
+      _authorController.clear();
+      _textController.clear();
+      widget.onNoteAdded();
+    } on PatientApiException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final patient = widget.patient;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.cardPadding),
@@ -293,7 +378,7 @@ class _NotesCard extends StatelessWidget {
           Text('Clinical notes', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 12),
           if (patient.notes.isEmpty)
-            Text('No notes yet — add one after the next visit.', style: AppTextStyles.bodySmall(context))
+            Text('No notes yet. Add one after the next visit.', style: AppTextStyles.bodySmall(context))
           else
             for (final n in patient.notes) ...[
               Padding(
@@ -309,6 +394,28 @@ class _NotesCard extends StatelessWidget {
               ),
               if (n != patient.notes.last) Divider(height: 1, color: AppColors.of(context).line),
             ],
+          const SizedBox(height: 16),
+          Divider(height: 1, color: AppColors.of(context).line),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: TextField(controller: _authorController, decoration: const InputDecoration(labelText: 'Your name'))),
+              const SizedBox(width: 12),
+              Expanded(flex: 2, child: TextField(controller: _textController, decoration: const InputDecoration(labelText: 'Add a note'))),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _submitting ? null : _submit,
+                child: _submitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Add'),
+              ),
+            ],
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: AppColors.of(context).riskHigh)),
+          ],
         ],
       ),
     );
