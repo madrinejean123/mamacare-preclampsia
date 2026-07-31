@@ -135,14 +135,14 @@ class _MetricsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final edd = patient.edd != null ? DateFormat('MMM d, y').format(patient.edd!) : '—';
+    final edd = patient.edd != null ? DateFormat('MMM d, y').format(patient.edd!) : 'Not set';
     final cards = [
       _SmallMetric(label: 'Age', value: '${patient.age}'),
       _SmallMetric(label: 'Gestational week', value: 'Wk ${patient.gestationalWeek}', caption: 'EDD $edd'),
       _SmallMetric(label: 'Gravida / Para', value: 'G${patient.gravida} P${patient.para}'),
       _SmallMetric(
         label: 'Latest BP',
-        value: patient.assessments.isEmpty ? '—' : '${patient.systolicBp}/${patient.diastolicBp}',
+        value: patient.assessments.isEmpty ? 'None yet' : '${patient.systolicBp}/${patient.diastolicBp}',
       ),
     ];
 

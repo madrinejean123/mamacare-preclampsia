@@ -88,10 +88,10 @@ class PatientService {
   }) async {
     final data = await _post('/patients', {
       'name': name,
-      if (age != null) 'age': age,
-      if (gestationalWeek != null) 'gestational_week': gestationalWeek,
-      if (gravida != null) 'gravida': gravida,
-      if (para != null) 'para': para,
+      'age': ?age,
+      'gestational_week': ?gestationalWeek,
+      'gravida': ?gravida,
+      'para': ?para,
     }) as Map<String, dynamic>;
     return Patient.fromListJson(data);
   }

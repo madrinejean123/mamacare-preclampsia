@@ -354,8 +354,8 @@ class _PatientLoginCardState extends State<_PatientLoginCard> {
         password: _passwordController.text,
       );
       setState(() {
-        _successMessage = 'Portal login created. Share these credentials with the patient directly — '
-            'they are not shown again after you leave this page.';
+        _successMessage = 'Portal login created. Share these credentials with the patient directly. '
+            'They are not shown again after you leave this page.';
       });
       _emailController.clear();
       _passwordController.clear();
@@ -382,7 +382,7 @@ class _PatientLoginCardState extends State<_PatientLoginCard> {
           Text('Create patient portal access', style: AppTextStyles.cardHeading(context)),
           const SizedBox(height: 4),
           Text(
-            'Gives a patient her own read-only login to view her vitals and status — not her clinical notes or risk score.',
+            'Gives a patient her own read-only login to view her vitals and status. Not her clinical notes or risk score.',
             style: AppTextStyles.caption(context),
           ),
           const SizedBox(height: 14),

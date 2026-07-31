@@ -291,7 +291,7 @@ class _ReferralsCard extends StatelessWidget {
           const SizedBox(height: 10),
           AlertStrip(
             icon: Icons.info_outline_rounded,
-            text: 'Referral tracking isn\'t built yet — there\'s no referrals table in the database. '
+            text: 'Referral tracking isn\'t built yet. There\'s no referrals table in the database. '
                 'The "Refer patient" button on a result screen doesn\'t record anything today.',
           ),
         ],
