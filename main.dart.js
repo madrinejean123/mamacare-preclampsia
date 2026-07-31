@@ -91636,7 +91636,7 @@ break
 case 6:case 1:return A.P(q,r)
 case 2:return A.O(o.at(-1),r)}})
 return A.Q($async$lE,r)},
-B(a){var s,r=this,q=null,p=A.W(a),o=A.cz(A.W(a).z),n=A.b3(14),m=A.U("Create patient portal access",q,q,q,A.eS(a,q),q,q),l=A.U("Gives a patient her own read-only login to view her vitals and status \u2014 not her clinical notes or risk score.",q,q,q,A.cr(a,q),q,q),k=r.d
+B(a){var s,r=this,q=null,p=A.W(a),o=A.cz(A.W(a).z),n=A.b3(14),m=A.U("Create patient portal access",q,q,q,A.eS(a,q),q,q),l=A.U("Gives a patient her own read-only login to view her vitals and status. Not her clinical notes or risk score.",q,q,q,A.cr(a,q),q,q),k=r.d
 k===$&&A.a()
 s=t.p
 k=A.b([m,B.d2,l,B.bV,A.m1(new A.awK(r),k,t.kv),B.aU,A.h8(r.f,B.JS,q,q,!1,q,q),B.aU,A.h8(r.r,B.pK,q,q,!0,q,q)],s)
@@ -91658,7 +91658,7 @@ s.w=!0
 s.y=s.x=null},
 $S:0}
 A.awE.prototype={
-$0(){this.a.y="Portal login created. Share these credentials with the patient directly \u2014 they are not shown again after you leave this page."},
+$0(){this.a.y="Portal login created. Share these credentials with the patient directly. They are not shown again after you leave this page."},
 $S:0}
 A.awF.prototype={
 $0(){return this.a.x=this.b.a},
@@ -92482,7 +92482,7 @@ B(a){var s=null
 return A.aD(A.b([A.aL(s,s,B.n,s,s,new A.aW(this.c,s,s,s,s,s,B.bM),s,9,s,s,s,s,s,9),B.dA,A.U(this.d,s,s,s,A.dn(a,A.W(a).f),s,s),B.dA,A.U(this.e,s,s,s,A.f9(a,s),s,s)],t.p),B.o,B.f,B.h,0)}}
 A.a_g.prototype={
 B(a){var s=null,r=A.W(a),q=A.cz(A.W(a).z),p=A.b3(14)
-return A.aL(s,A.ai(A.b([A.U("Recent referrals",s,s,s,A.eS(a,s),s,s),B.c8,new A.ep(B.pG,"Referral tracking isn't built yet \u2014 there's no referrals table in the database. The \"Refer patient\" button on a result screen doesn't record anything today.",B.ha,s)],t.p),B.p,B.f,B.h),B.n,s,s,new A.aW(r.y,s,q,p,s,s,B.z),s,s,s,s,B.ao,s,s,s)}}
+return A.aL(s,A.ai(A.b([A.U("Recent referrals",s,s,s,A.eS(a,s),s,s),B.c8,new A.ep(B.pG,"Referral tracking isn't built yet. There's no referrals table in the database. The \"Refer patient\" button on a result screen doesn't record anything today.",B.ha,s)],t.p),B.p,B.f,B.h),B.n,s,s,new A.aW(r.y,s,q,p,s,s,B.z),s,s,s,s,B.ao,s,s,s)}}
 A.tw.prototype={
 a9(){return new A.Kc(new A.eI())}}
 A.Kc.prototype={
@@ -92807,8 +92807,8 @@ A.aAX.prototype={
 $0(){return A.dc(this.a).da("/assess",null)},
 $S:0}
 A.Yy.prototype={
-B(a){var s,r,q,p=null,o=this.c,n=o.e,m=n!=null?A.uX("MMM d, y").kY(n):"\u2014"
-n=o.as.length===0?"\u2014":""+o.x+"/"+o.y
+B(a){var s,r,q,p=null,o=this.c,n=o.e,m=n!=null?A.uX("MMM d, y").kY(n):"Not set"
+n=o.as.length===0?"None yet":""+o.x+"/"+o.y
 s=A.b([new A.pp("Age",""+o.c,p,p),new A.pp("Gestational week","Wk "+o.d,"EDD "+m,p),new A.pp("Gravida / Para","G"+o.f+" P"+o.r,p,p),new A.pp("Latest BP",n,p,p)],t.Te)
 if(this.d)return A.aKf(1.2,s,2,16,16,B.wp,!0)
 o=t.p
