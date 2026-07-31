@@ -36,11 +36,19 @@ const _insightsSection = [
   NavDestinationSpec(label: 'Reports', icon: Icons.description_outlined, route: '/reports'),
 ];
 
-const _manageSection = [
-  NavDestinationSpec(label: 'Settings', icon: Icons.settings_outlined, route: '/settings'),
-];
+const _adminDestination = NavDestinationSpec(label: 'Admin', icon: Icons.admin_panel_settings_outlined, route: '/admin');
+const _settingsDestination = NavDestinationSpec(label: 'Settings', icon: Icons.settings_outlined, route: '/settings');
 
-const _allDestinations = [..._clinicSection, ..._insightsSection, ..._manageSection];
+List<NavDestinationSpec> _manageSection(bool isAdmin) => [
+      if (isAdmin) _adminDestination,
+      _settingsDestination,
+    ];
+
+List<NavDestinationSpec> _allDestinations(bool isAdmin) => [
+      ..._clinicSection,
+      ..._insightsSection,
+      ..._manageSection(isAdmin),
+    ];
 
 /// Shell that switches between a fixed web sidebar, a tablet NavigationRail,
 /// and a phone bottom nav bar depending on breakpoint. Wrap every
@@ -57,22 +65,21 @@ class AppScaffold extends StatelessWidget {
     this.clinicName = 'Mulago Antenatal Clinic',
   });
 
-  int get _selectedIndex {
-    final i = _allDestinations.indexWhere((d) => d.route == currentRoute);
-    return i < 0 ? 0 : i;
-  }
-
   @override
   Widget build(BuildContext context) {
     final screenClass = screenClassOf(context);
     final colors = AppColors.of(context);
+    final isAdmin = AuthService.instance.isAdmin;
+    final allDestinations = _allDestinations(isAdmin);
+    final rawIndex = allDestinations.indexWhere((d) => d.route == currentRoute);
+    final selectedIndex = rawIndex < 0 ? 0 : rawIndex;
 
     if (screenClass == ScreenClass.web) {
       return Scaffold(
         backgroundColor: colors.paper,
         body: Row(
           children: [
-            _Sidebar(currentRoute: currentRoute, clinicName: clinicName),
+            _Sidebar(currentRoute: currentRoute, clinicName: clinicName, isAdmin: isAdmin),
             Expanded(
               child: Center(
                 child: ConstrainedBox(
@@ -96,8 +103,8 @@ class AppScaffold extends StatelessWidget {
           children: [
             NavigationRail(
               backgroundColor: colors.tealDark,
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (i) => context.go(_allDestinations[i].route),
+              selectedIndex: selectedIndex,
+              onDestinationSelected: (i) => context.go(allDestinations[i].route),
               labelType: NavigationRailLabelType.all,
               selectedIconTheme: const IconThemeData(color: Colors.white),
               unselectedIconTheme: IconThemeData(color: Colors.white.withValues(alpha: 0.55)),
@@ -130,7 +137,7 @@ class AppScaffold extends StatelessWidget {
                   ),
                 ),
               ),
-              destinations: _allDestinations
+              destinations: allDestinations
                   .map((d) => NavigationRailDestination(icon: Icon(d.icon), label: Text(d.label)))
                   .toList(),
             ),
@@ -151,7 +158,8 @@ class AppScaffold extends StatelessWidget {
       _clinicSection[1],
       _clinicSection[2],
       _insightsSection[0],
-      _manageSection[0],
+      if (isAdmin) _adminDestination,
+      _settingsDestination,
     ];
     final navIndex = navItems.indexWhere((d) => d.route == currentRoute);
 
@@ -222,8 +230,9 @@ class AppScaffold extends StatelessWidget {
 class _Sidebar extends StatelessWidget {
   final String currentRoute;
   final String clinicName;
+  final bool isAdmin;
 
-  const _Sidebar({required this.currentRoute, required this.clinicName});
+  const _Sidebar({required this.currentRoute, required this.clinicName, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +268,7 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 22),
           _SectionLabel('Manage'),
           const SizedBox(height: 6),
-          ..._manageSection.map((d) => _SidebarItem(spec: d, selected: d.route == currentRoute)),
+          ..._manageSection(isAdmin).map((d) => _SidebarItem(spec: d, selected: d.route == currentRoute)),
           const Spacer(),
           InkWell(
             onTap: () => _logout(context),

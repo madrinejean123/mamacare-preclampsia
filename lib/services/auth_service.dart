@@ -22,20 +22,32 @@ class AuthService extends ChangeNotifier {
   static final AuthService instance = AuthService._();
 
   static const _tokenKey = 'auth_token';
+  static const _roleKey = 'auth_role';
+  static const _patientIdKey = 'auth_patient_id';
 
   String? _token;
   String? _userName;
+  String? _role;
+  String? _patientId;
   bool _ready = false;
 
   String? get token => _token;
   String? get userName => _userName;
+  String? get role => _role;
+  String? get patientId => _patientId;
   bool get isLoggedIn => _token != null;
+  bool get isAdmin => _role == 'admin';
+  bool get isClinician => _role == 'clinician';
+  bool get isPatient => _role == 'patient';
+  bool get isStaff => isAdmin || isClinician;
   bool get ready => _ready;
 
   /// Restores a persisted session, if any. Call once before the app renders.
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
+    _role = prefs.getString(_roleKey);
+    _patientId = prefs.getString(_patientIdKey);
     _ready = true;
     notifyListeners();
   }
@@ -71,19 +83,32 @@ class AuthService extends ChangeNotifier {
       throw AuthApiException(data['error']?.toString() ?? 'Request failed.');
     }
 
+    final user = data['user'] as Map<String, dynamic>;
     _token = data['token'] as String;
-    _userName = (data['user'] as Map<String, dynamic>)['name'] as String?;
+    _userName = user['name'] as String?;
+    _role = user['role'] as String? ?? 'clinician';
+    _patientId = user['patient_id']?.toString();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, _token!);
+    await prefs.setString(_roleKey, _role!);
+    if (_patientId != null) {
+      await prefs.setString(_patientIdKey, _patientId!);
+    } else {
+      await prefs.remove(_patientIdKey);
+    }
     notifyListeners();
   }
 
   Future<void> logout() async {
     _token = null;
     _userName = null;
+    _role = null;
+    _patientId = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
+    await prefs.remove(_roleKey);
+    await prefs.remove(_patientIdKey);
     notifyListeners();
   }
 }
