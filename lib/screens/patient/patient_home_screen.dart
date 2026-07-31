@@ -95,7 +95,7 @@ class _TopBar extends StatelessWidget {
             child: Icon(Icons.favorite, color: colors.tealPrimary, size: 15),
           ),
           const SizedBox(width: 10),
-          Text('MamaSafe', style: AppTextStyles.logo(context, color: Colors.white).copyWith(fontSize: 17)),
+          Text('MamaPreCare', style: AppTextStyles.logo(context, color: Colors.white).copyWith(fontSize: 17)),
           const Spacer(),
           ThemeToggleButton(color: Colors.white.withValues(alpha: 0.85)),
           IconButton(

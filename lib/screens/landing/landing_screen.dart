@@ -81,7 +81,7 @@ class _TopNav extends StatelessWidget {
           child: Icon(Icons.favorite, color: colors.tealPrimary, size: 15),
         ),
         const SizedBox(width: 10),
-        Text('MamaSafe', style: AppTextStyles.logo(context, color: Colors.white)),
+        Text('MamaPreCare', style: AppTextStyles.logo(context, color: Colors.white)),
       ],
     );
 
@@ -197,7 +197,7 @@ class _HeroText extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          'MamaSafe combines routine antenatal measurements with a machine-learning model to flag mothers at risk of preeclampsia so clinics can monitor, refer, and act early.',
+          'MamaPreCare combines routine antenatal measurements with a machine-learning model to flag mothers at risk of preeclampsia so clinics can monitor, refer, and act early.',
           style: AppTextStyles.body(context, color: AppColors.of(context).inkSoft),
         ),
         const SizedBox(height: 26),
@@ -256,7 +256,7 @@ class _HeroPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Pregnancy timeline · Amina N.', style: AppTextStyles.caption(context, color: Colors.white.withValues(alpha: 0.55))),
+          Text('Pregnancy timeline · Sample patient', style: AppTextStyles.caption(context, color: Colors.white.withValues(alpha: 0.55))),
           const SizedBox(height: 14),
           const WeekRibbon(currentWeek: 24, riskWeek: 24),
           const SizedBox(height: 10),
@@ -429,7 +429,7 @@ class _Footer extends StatelessWidget {
               child: Icon(Icons.favorite, color: colors.tealPrimary, size: 14),
             ),
             const SizedBox(width: 10),
-            Text('MamaSafe', style: AppTextStyles.logo(context, color: Colors.white)),
+            Text('MamaPreCare', style: AppTextStyles.logo(context, color: Colors.white)),
           ],
         ),
         const SizedBox(height: 12),
@@ -492,7 +492,7 @@ class _Footer extends StatelessWidget {
                 Divider(color: Colors.white.withValues(alpha: 0.12), height: 1),
                 const SizedBox(height: 20),
                 Text(
-                  '© 2026 MamaSafe. All rights reserved.',
+                  '© 2026 MamaPreCare. All rights reserved.',
                   style: AppTextStyles.caption(context, color: Colors.white.withValues(alpha: 0.5)),
                 ),
               ],

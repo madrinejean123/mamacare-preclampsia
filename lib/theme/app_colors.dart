@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Brand and semantic color tokens for MamaSafe, as a ThemeExtension so the
+/// Brand and semantic color tokens for MamaPreCare, as a ThemeExtension so the
 /// whole app can switch between [light] and [dark] at runtime.
 /// Access via `AppColors.of(context)` inside any build method — never
 /// reference [light] or [dark] directly from widget code.

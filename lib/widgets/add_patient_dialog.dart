@@ -79,10 +79,31 @@ class _AddPatientDialogState extends State<AddPatientDialog> {
             ),
             const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: TextField(controller: _gravidaController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Gravida'))),
+                Expanded(
+                  child: TextField(
+                    controller: _gravidaController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Gravida',
+                      helperText: 'Total pregnancies',
+                      helperMaxLines: 2,
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: TextField(controller: _paraController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Para'))),
+                Expanded(
+                  child: TextField(
+                    controller: _paraController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Para',
+                      helperText: 'Births after 24 wks',
+                      helperMaxLines: 2,
+                    ),
+                  ),
+                ),
               ],
             ),
             if (_error != null) ...[

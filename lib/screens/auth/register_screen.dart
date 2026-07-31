@@ -69,7 +69,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Text('Create your account', style: AppTextStyles.screenTitle(context).copyWith(fontSize: 26)),
           const SizedBox(height: 6),
-          Text('Set up MamaSafe for your antenatal clinic.', style: AppTextStyles.bodySmall(context)),
+          Text('Set up MamaPreCare for your antenatal clinic.', style: AppTextStyles.bodySmall(context)),
           const SizedBox(height: 24),
           _FieldPair(
             phone: phone,

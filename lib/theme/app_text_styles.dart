@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
-/// Type scale for MamaSafe.
+/// Type scale for MamaPreCare.
 /// Fraunces (serif) = display face for titles, big numbers, the risk verdict.
 /// Inter (sans) = everything else.
 ///

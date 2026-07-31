@@ -33,7 +33,7 @@ class _MamaSafeAppState extends State<MamaSafeApp> {
       mode: _mode,
       toggle: _toggle,
       child: MaterialApp.router(
-        title: 'MamaSafe',
+        title: 'MamaPreCare',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,

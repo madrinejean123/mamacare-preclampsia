@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import 'app_spacing.dart';
 
-/// Builds the light and dark [ThemeData] for MamaSafe. Both register an
+/// Builds the light and dark [ThemeData] for MamaPreCare. Both register an
 /// [AppColors] ThemeExtension so screens can read the active palette via
 /// `AppColors.of(context)`.
 class AppTheme {

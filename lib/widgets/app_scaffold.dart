@@ -178,7 +178,7 @@ class AppScaffold extends StatelessWidget {
               child: Icon(Icons.favorite, color: colors.tealPrimary, size: 14),
             ),
             const SizedBox(width: 8),
-            Text('MamaSafe', style: AppTextStyles.logo(context, color: Colors.white).copyWith(fontSize: 17)),
+            Text('MamaPreCare', style: AppTextStyles.logo(context, color: Colors.white).copyWith(fontSize: 17)),
           ],
         ),
         actions: [
@@ -252,7 +252,7 @@ class _Sidebar extends StatelessWidget {
                 child: Icon(Icons.favorite, color: AppColors.of(context).tealPrimary, size: 16),
               ),
               const SizedBox(width: 10),
-              Text('MamaSafe', style: AppTextStyles.logo(context, color: Colors.white)),
+              Text('MamaPreCare', style: AppTextStyles.logo(context, color: Colors.white)),
               const Spacer(),
               ThemeToggleButton(color: Colors.white.withValues(alpha: 0.75)),
             ],

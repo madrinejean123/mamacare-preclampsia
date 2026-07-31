@@ -54,7 +54,7 @@ class AuthShell extends StatelessWidget {
                             child: const Icon(Icons.favorite, color: Colors.white, size: 15),
                           ),
                           const SizedBox(width: 10),
-                          Text('MamaSafe', style: AppTextStyles.logo(context)),
+                          Text('MamaPreCare', style: AppTextStyles.logo(context)),
                         ],
                       ),
                     ),
