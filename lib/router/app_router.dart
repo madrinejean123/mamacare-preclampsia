@@ -28,12 +28,12 @@ final GoRouter appRouter = GoRouter(
 
     if (_alwaysPublic.contains(loc)) return null;
 
-    if (!auth.isLoggedIn) {
-      return _authOnlyRoutes.contains(loc) ? null : '/login';
-    }
+    // Always show the login/register form itself when asked for it,
+    // even if an old session is still stored — never silently skip it.
+    if (_authOnlyRoutes.contains(loc)) return null;
 
-    if (_authOnlyRoutes.contains(loc)) {
-      return auth.isPatient ? '/me' : '/dashboard';
+    if (!auth.isLoggedIn) {
+      return '/login';
     }
 
     // Patients only ever see their own read-only view.
